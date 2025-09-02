@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Full Network Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 40px;
+      background: #f0f2f5;
+    }
+    h1 {
+      margin-bottom: 20px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 18px;
+      border: none;
+      border-radius: 8px;
+      background: #0078ff;
+      color: white;
+      cursor: pointer;
+      margin: 10px;
+    }
+    button:hover {
+      background: #005fcc;
+    }
+    #results {
+      margin-top: 30px;
+      font-size: 18px;
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      display: inline-block;
+      text-align: left;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    .line {
+      margin: 8px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>Network Speed & Info Test</h1>
+  <button onclick="runTest()">Run Test</button>
+
+  <div id="results">
+    <div class="line"><b>IP Address:</b> <span id="ip">-</span></div>
+    <div class="line"><b>ISP / Network:</b> <span id="isp">-</span></div>
+    <div class="line"><b>Ping:</b> <span id="ping">-</span></div>
+    <div class="line"><b>Download Speed:</b> <span id="download">-</span></div>
+  </div>
+
+  <script>
+    async function getIPInfo() {
+      try {
+        let res = await fetch("https://ipapi.co/json/");
+        let data = await res.json();
+        document.getElementById("ip").textContent = data.ip;
+        document.getElementById("isp").textContent = data.org || data.asn || "Unknown";
+      } catch (err) {
+        document.getElementById("ip").textContent = "Error";
+        document.getElementById("isp").textContent = "Error";
+      }
+    }
+
+    async function testDownloadSpeed() {
+      const fileUrl = "https://speed.hetzner.de/10MB.bin"; // test file
+      const startTime = new Date().getTime();
+      let receivedBytes = 0;
+
+      try {
+        const response = await fetch(fileUrl + "?cache=" + Math.random());
+        const reader = response.body.getReader();
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          receivedBytes += value.length;
+        }
+
+        const endTime = new Date().getTime();
+        const duration = (endTime - startTime) / 1000;
+        const bitsLoaded = receivedBytes * 8;
+        const speedMbps = (bitsLoaded / duration / (1024 * 1024)).toFixed(2);
+
+        document.getElementById("download").textContent = `${speedMbps} Mbps`;
+      } catch (err) {
+        document.getElementById("download").textContent = "Error";
+      }
+    }
+
+    async function testPing() {
+      const pingUrl = "https://speed.hetzner.de/1MB.bin"; 
+      let total = 0, count = 5;
+
+      for (let i = 0; i < count; i++) {
+        const start = performance.now();
+        try {
+          await fetch(pingUrl + "?cache=" + Math.random(), { method: "HEAD" });
+          const end = performance.now();
+          total += (end - start);
+        } catch {
+          total += 1000; // timeout fallback
+        }
+      }
+      const avgPing = (total / count).toFixed(0);
+      document.getElementById("ping").textContent = `${avgPing} ms`;
+    }
+
+    async function runTest() {
+      document.getElementById("ip").textContent = "Testing...";
+      document.getElementById("isp").textContent = "Testing...";
+      document.getElementById("ping").textContent = "Testing...";
+      document.getElementById("download").textContent = "Testing...";
+
+      await getIPInfo();
+      await testPing();
+      await testDownloadSpeed();
+    }
+  </script>
+</body>
+</html>
