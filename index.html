@@ -5,33 +5,36 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cloudflare Speed Test</title>
   <style>
-    body {
+    html, body {
+      margin: 0;
+      height: 100%;
       background-color: #000;
       color: #fff;
       font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
       text-align: center;
-      padding: 50px 20px;
     }
     #start {
-      padding: 10px 20px;
-      font-size: 18px;
-      background-color: #0078ff;
+      font-size: 32px;
       color: #fff;
       border: none;
-      border-radius: 8px;
       cursor: pointer;
+      margin-bottom: 50px;
+      background: none;
     }
     #start:hover {
-      background-color: #005fcc;
+      text-decoration: underline;
     }
-    #results {
-      margin-top: 30px;
-      font-size: 20px;
+    #results p {
+      font-size: 48px;
+      margin: 20px 0;
     }
   </style>
 </head>
 <body>
-  <h1>Cloudflare Network Speed Test</h1>
   <button id="start">Start Test</button>
   <div id="results">
     <p id="ping">Ping: - ms</p>
@@ -44,25 +47,26 @@
     const downloadElement = document.getElementById('download');
 
     async function measurePing() {
-      const pingAttempts = 5;
+      const attempts = 5;
       let totalPing = 0;
 
-      for (let i = 0; i < pingAttempts; i++) {
+      for (let i = 0; i < attempts; i++) {
         const start = performance.now();
         try {
-          await fetch('https://www.cloudflare.com/favicon.ico', {cache: 'no-store'});
+          // Tiny 1-byte download for ping
+          await fetch('https://speed.cloudflare.com/__down?bytes=1', {cache: 'no-store'});
           const end = performance.now();
           const ping = end - start;
           totalPing += ping;
           pingElement.textContent = `Ping: ${Math.round(ping)} ms`;
         } catch {
-          totalPing += 1000; // fallback on error
-          pingElement.textContent = `Ping: Error`;
+          totalPing += 1000;
+          pingElement.textContent = 'Ping: Error';
         }
-        await new Promise(r => setTimeout(r, 200)); // small delay between pings
+        await new Promise(r => setTimeout(r, 100));
       }
 
-      const avgPing = totalPing / pingAttempts;
+      const avgPing = totalPing / attempts;
       pingElement.textContent = `Ping: ${Math.round(avgPing)} ms (average)`;
     }
 
@@ -74,18 +78,17 @@
       try {
         const response = await fetch(url, {cache: 'no-store'});
         const reader = response.body.getReader();
-        let bytesReceived = 0;
+        let received = 0;
 
-        while(true) {
+        while (true) {
           const {done, value} = await reader.read();
-          if(done) break;
-          bytesReceived += value.length;
-          // live update
+          if (done) break;
+          received += value.length;
           const duration = (performance.now() - start) / 1000;
-          const mbps = (bytesReceived * 8 / duration / 1024 / 1024).toFixed(2);
+          const mbps = (received * 8 / duration / 1024 / 1024).toFixed(2);
           downloadElement.textContent = `Download: ${mbps} Mbps`;
         }
-      } catch (err) {
+      } catch {
         downloadElement.textContent = 'Download: Error';
       }
     }
