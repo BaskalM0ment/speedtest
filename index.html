@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Network Speed Test</title>
+  <title>Cloudflare Speed Test</title>
   <style>
     body {
       background-color: #000;
       color: #fff;
       font-family: Arial, sans-serif;
       text-align: center;
-      padding: 20px;
+      padding: 50px 20px;
     }
     #start {
       padding: 10px 20px;
@@ -25,13 +25,13 @@
       background-color: #005fcc;
     }
     #results {
-      margin-top: 20px;
+      margin-top: 30px;
       font-size: 20px;
     }
   </style>
 </head>
 <body>
-  <h1>Network Speed Test</h1>
+  <h1>Cloudflare Network Speed Test</h1>
   <button id="start">Start Test</button>
   <div id="results">
     <p id="ping">Ping: - ms</p>
@@ -43,29 +43,58 @@
     const pingElement = document.getElementById('ping');
     const downloadElement = document.getElementById('download');
 
+    async function measurePing() {
+      const pingAttempts = 5;
+      let totalPing = 0;
+
+      for (let i = 0; i < pingAttempts; i++) {
+        const start = performance.now();
+        try {
+          await fetch('https://www.cloudflare.com/favicon.ico', {cache: 'no-store'});
+          const end = performance.now();
+          const ping = end - start;
+          totalPing += ping;
+          pingElement.textContent = `Ping: ${Math.round(ping)} ms`;
+        } catch {
+          totalPing += 1000; // fallback on error
+          pingElement.textContent = `Ping: Error`;
+        }
+        await new Promise(r => setTimeout(r, 200)); // small delay between pings
+      }
+
+      const avgPing = totalPing / pingAttempts;
+      pingElement.textContent = `Ping: ${Math.round(avgPing)} ms (average)`;
+    }
+
+    async function measureDownloadSpeed() {
+      const fileSize = 1048576; // 1MB
+      const url = `https://speed.cloudflare.com/__down?bytes=${fileSize}`;
+      const start = performance.now();
+
+      try {
+        const response = await fetch(url, {cache: 'no-store'});
+        const reader = response.body.getReader();
+        let bytesReceived = 0;
+
+        while(true) {
+          const {done, value} = await reader.read();
+          if(done) break;
+          bytesReceived += value.length;
+          // live update
+          const duration = (performance.now() - start) / 1000;
+          const mbps = (bytesReceived * 8 / duration / 1024 / 1024).toFixed(2);
+          downloadElement.textContent = `Download: ${mbps} Mbps`;
+        }
+      } catch (err) {
+        downloadElement.textContent = 'Download: Error';
+      }
+    }
+
     startButton.addEventListener('click', async () => {
       pingElement.textContent = 'Ping: Testing...';
       downloadElement.textContent = 'Download: Testing...';
-
-      try {
-        // Measure ping
-        const pingStart = performance.now();
-        await fetch('https://www.cloudflare.com/favicon.ico');
-        const pingEnd = performance.now();
-        const ping = Math.round(pingEnd - pingStart);
-        pingElement.textContent = `Ping: ${ping} ms`;
-
-        // Measure download speed
-        const downloadStart = performance.now();
-        const response = await fetch('https://speed.cloudflare.com/__down?bytes=1048576');
-        const downloadEnd = performance.now();
-        const downloadTime = (downloadEnd - downloadStart) / 1000; // in seconds
-        const downloadSpeed = (1048576 * 8) / (downloadTime * 1024 * 1024); // in Mbps
-        downloadElement.textContent = `Download: ${downloadSpeed.toFixed(2)} Mbps`;
-      } catch (error) {
-        pingElement.textContent = 'Ping: Error';
-        downloadElement.textContent = 'Download: Error';
-      }
+      await measurePing();
+      await measureDownloadSpeed();
     });
   </script>
 </body>
