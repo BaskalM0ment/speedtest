@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cloudflare Speed Test</title>
+  <title>Cloudflare Full Speed Test</title>
   <style>
     html, body {
       margin: 0;
@@ -25,9 +25,7 @@
       margin-bottom: 50px;
       background: none;
     }
-    #start:hover {
-      text-decoration: underline;
-    }
+    #start:hover { text-decoration: underline; }
     #results p {
       font-size: 48px;
       margin: 20px 0;
@@ -39,22 +37,22 @@
   <div id="results">
     <p id="ping">Ping: - ms</p>
     <p id="download">Download: - Mbps</p>
+    <p id="upload">Upload: - Mbps</p>
   </div>
 
   <script>
     const startButton = document.getElementById('start');
     const pingElement = document.getElementById('ping');
     const downloadElement = document.getElementById('download');
+    const uploadElement = document.getElementById('upload');
 
     async function measurePing() {
       const attempts = 5;
       let totalPing = 0;
-
       for (let i = 0; i < attempts; i++) {
         const start = performance.now();
         try {
-          // Tiny 1-byte download for ping
-          await fetch('https://speed.cloudflare.com/__down?bytes=1', {cache: 'no-store'});
+          await fetch('https://speed.cloudflare.com/__down?bytes=1', {cache:'no-store'});
           const end = performance.now();
           const ping = end - start;
           totalPing += ping;
@@ -65,7 +63,6 @@
         }
         await new Promise(r => setTimeout(r, 100));
       }
-
       const avgPing = totalPing / attempts;
       pingElement.textContent = `Ping: ${Math.round(avgPing)} ms (average)`;
     }
@@ -76,13 +73,12 @@
       const start = performance.now();
 
       try {
-        const response = await fetch(url, {cache: 'no-store'});
+        const response = await fetch(url, {cache:'no-store'});
         const reader = response.body.getReader();
         let received = 0;
-
-        while (true) {
-          const {done, value} = await reader.read();
-          if (done) break;
+        while(true){
+          const {done,value} = await reader.read();
+          if(done) break;
           received += value.length;
           const duration = (performance.now() - start) / 1000;
           const mbps = (received * 8 / duration / 1024 / 1024).toFixed(2);
@@ -93,11 +89,35 @@
       }
     }
 
+    async function measureUploadSpeed() {
+      const uploadSize = 1024 * 1024; // 1MB
+      const data = new Uint8Array(uploadSize);
+      const start = performance.now();
+
+      try {
+        // Use Cloudflare Workers or a server you control to accept uploads
+        // This endpoint is just a placeholder; you need CORS-enabled endpoint
+        await fetch('https://speed.cloudflare.com/__up', {
+          method: 'POST',
+          body: data,
+          cache: 'no-store'
+        });
+        const duration = (performance.now() - start) / 1000;
+        const mbps = (uploadSize * 8 / duration / 1024 / 1024).toFixed(2);
+        uploadElement.textContent = `Upload: ${mbps} Mbps`;
+      } catch {
+        uploadElement.textContent = 'Upload: Error';
+      }
+    }
+
     startButton.addEventListener('click', async () => {
       pingElement.textContent = 'Ping: Testing...';
       downloadElement.textContent = 'Download: Testing...';
+      uploadElement.textContent = 'Upload: Testing...';
+
       await measurePing();
       await measureDownloadSpeed();
+      await measureUploadSpeed();
     });
   </script>
 </body>
