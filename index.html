@@ -1,124 +1,136 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Full Network Test</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      padding: 40px;
-      background: #f0f2f5;
-    }
-    h1 {
-      margin-bottom: 20px;
-    }
-    button {
-      padding: 10px 20px;
-      font-size: 18px;
-      border: none;
-      border-radius: 8px;
-      background: #0078ff;
-      color: white;
-      cursor: pointer;
-      margin: 10px;
-    }
-    button:hover {
-      background: #005fcc;
-    }
-    #results {
-      margin-top: 30px;
-      font-size: 18px;
-      background: white;
-      padding: 20px;
-      border-radius: 10px;
-      display: inline-block;
-      text-align: left;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-    }
-    .line {
-      margin: 8px 0;
-    }
-  </style>
+<meta charset="UTF-8">
+<title>Orkla-Style Speed Test</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #f0f2f5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 50px 20px;
+  }
+  h1 {
+    margin-bottom: 20px;
+  }
+  canvas {
+    background: white;
+    border-radius: 50%;
+    box-shadow: 0 0 15px rgba(0,0,0,0.2);
+  }
+  #info {
+    margin-top: 30px;
+    font-size: 18px;
+  }
+  #start {
+    padding: 10px 20px;
+    font-size: 18px;
+    border: none;
+    border-radius: 8px;
+    background: #0078ff;
+    color: #fff;
+    cursor: pointer;
+    margin-bottom: 20px;
+  }
+  #start:hover { background:#005fcc; }
+</style>
 </head>
 <body>
-  <h1>Network Speed & Info Test</h1>
-  <button onclick="runTest()">Run Test</button>
+<h1>Network Speed Test</h1>
+<button id="start">Start Test</button>
+<canvas id="speedometer" width="300" height="300"></canvas>
+<div id="info">
+  <div id="ping">Ping: - ms</div>
+  <div id="download">Download: - Mbps</div>
+</div>
 
-  <div id="results">
-    <div class="line"><b>IP Address:</b> <span id="ip">-</span></div>
-    <div class="line"><b>ISP / Network:</b> <span id="isp">-</span></div>
-    <div class="line"><b>Ping:</b> <span id="ping">-</span></div>
-    <div class="line"><b>Download Speed:</b> <span id="download">-</span></div>
-  </div>
+<script>
+const downloadUrl = "https://speed.hetzner.de/1MB.bin"; // small test file
+const pingUrl = "https://www.google.com/images/branding/googlelogo/2x/googlelogo_light_color_92x30dp.png"; // small ping file
 
-  <script>
-    async function getIPInfo() {
-      try {
-        let res = await fetch("https://ipapi.co/json/");
-        let data = await res.json();
-        document.getElementById("ip").textContent = data.ip;
-        document.getElementById("isp").textContent = data.org || data.asn || "Unknown";
-      } catch (err) {
-        document.getElementById("ip").textContent = "Error";
-        document.getElementById("isp").textContent = "Error";
-      }
+const canvas = document.getElementById("speedometer");
+const ctx = canvas.getContext("2d");
+const center = canvas.width/2;
+
+function drawSpeedometer(speed) {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // Background circle
+  ctx.beginPath();
+  ctx.arc(center, center, 130, 0, 2*Math.PI);
+  ctx.fillStyle = "#e6e6e6";
+  ctx.fill();
+
+  // Draw arc representing speed
+  const maxSpeed = 100; // max Mbps
+  let endAngle = (speed/maxSpeed)*Math.PI*1.5 + Math.PI*0.75; 
+  ctx.beginPath();
+  ctx.arc(center, center, 120, Math.PI*0.75, endAngle);
+  ctx.lineWidth = 15;
+  ctx.strokeStyle = "#0078ff";
+  ctx.stroke();
+
+  // Speed text
+  ctx.font = "32px Arial";
+  ctx.fillStyle = "#000";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(speed.toFixed(1) + " Mbps", center, center);
+}
+
+async function testPing() {
+  const pingDiv = document.getElementById("ping");
+  let pingResults = [];
+  for(let i=0;i<5;i++){
+    const start = performance.now();
+    try {
+      await fetch(pingUrl + "?cache=" + Math.random(), { method: "HEAD" });
+      const end = performance.now();
+      pingResults.push(Math.round(end-start));
+    } catch {
+      pingResults.push(1000);
     }
+    pingDiv.textContent = "Ping: " + pingResults[pingResults.length-1] + " ms";
+    await new Promise(r=>setTimeout(r,200));
+  }
+  const avgPing = Math.round(pingResults.reduce((a,b)=>a+b)/pingResults.length);
+  pingDiv.textContent = `Ping: ${avgPing} ms`;
+}
 
-    async function testDownloadSpeed() {
-      const fileUrl = "https://speed.hetzner.de/10MB.bin"; // test file
-      const startTime = new Date().getTime();
-      let receivedBytes = 0;
-
-      try {
-        const response = await fetch(fileUrl + "?cache=" + Math.random());
-        const reader = response.body.getReader();
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          receivedBytes += value.length;
-        }
-
-        const endTime = new Date().getTime();
-        const duration = (endTime - startTime) / 1000;
-        const bitsLoaded = receivedBytes * 8;
-        const speedMbps = (bitsLoaded / duration / (1024 * 1024)).toFixed(2);
-
-        document.getElementById("download").textContent = `${speedMbps} Mbps`;
-      } catch (err) {
-        document.getElementById("download").textContent = "Error";
-      }
+async function testDownloadSpeed() {
+  const speedDiv = document.getElementById("download");
+  const startTime = performance.now();
+  try {
+    const response = await fetch(downloadUrl + "?cache=" + Math.random());
+    const reader = response.body.getReader();
+    let received = 0;
+    const contentLength = +response.headers.get("Content-Length") || 1024*1024;
+    while(true){
+      const {done,value} = await reader.read();
+      if(done) break;
+      received += value.length;
+      const duration = (performance.now() - startTime)/1000;
+      const bits = received*8;
+      const mbps = bits/duration/1024/1024;
+      speedDiv.textContent = `Download: ${mbps.toFixed(2)} Mbps`;
+      drawSpeedometer(Math.min(mbps,100)); // cap at 100 Mbps
+      await new Promise(r=>setTimeout(r,50));
     }
+  } catch(err) {
+    speedDiv.textContent = "Download: Error";
+    drawSpeedometer(0);
+  }
+}
 
-    async function testPing() {
-      const pingUrl = "https://speed.hetzner.de/1MB.bin"; 
-      let total = 0, count = 5;
-
-      for (let i = 0; i < count; i++) {
-        const start = performance.now();
-        try {
-          await fetch(pingUrl + "?cache=" + Math.random(), { method: "HEAD" });
-          const end = performance.now();
-          total += (end - start);
-        } catch {
-          total += 1000; // timeout fallback
-        }
-      }
-      const avgPing = (total / count).toFixed(0);
-      document.getElementById("ping").textContent = `${avgPing} ms`;
-    }
-
-    async function runTest() {
-      document.getElementById("ip").textContent = "Testing...";
-      document.getElementById("isp").textContent = "Testing...";
-      document.getElementById("ping").textContent = "Testing...";
-      document.getElementById("download").textContent = "Testing...";
-
-      await getIPInfo();
-      await testPing();
-      await testDownloadSpeed();
-    }
-  </script>
+document.getElementById("start").addEventListener("click", async () => {
+  document.getElementById("ping").textContent = "Ping: Testing...";
+  document.getElementById("download").textContent = "Download: Testing...";
+  drawSpeedometer(0);
+  await testPing();
+  await testDownloadSpeed();
+});
+</script>
 </body>
 </html>
